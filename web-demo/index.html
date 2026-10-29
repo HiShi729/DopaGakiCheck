@@ -19,6 +19,10 @@
     h1,h2,p { margin:0; }
     .intro h1 { position:relative; margin:27px 0 16px; font-size:clamp(37px,10vw,46px); font-weight:900; line-height:1.4; letter-spacing:-.065em; }
     .description { font-size:15px; color:var(--muted); line-height:1.95; position:relative; }
+    .quiz-notice { position:relative; margin-top:18px; padding:15px 17px; background:#1f272f; border:1px solid rgba(195,245,98,.22); border-radius:16px; }
+    .quiz-notice strong { display:block; color:var(--lime); font-size:18px; line-height:1.5; margin-bottom:7px; }
+    .quiz-notice p { color:var(--fg); font-size:13px; line-height:1.7; }
+    .intro .stats { margin:26px 0 28px; }
     .stats { display:grid; grid-template-columns:repeat(3,1fr); text-align:center; margin:32px 0 36px; }
     .stats strong { display:block; font-size:26px; line-height:1.2; }
     .stats span { display:block; color:var(--muted); font-size:10px; letter-spacing:.06em; margin-top:8px; font-weight:750; }
@@ -101,7 +105,11 @@ const reminder='これはゲーム内スコアであり、ドーパミン量、�
 function renderIntro(){
  mode='intro';
  app.innerHTML=`<main class="container intro"><div class="kicker">DOPA / MEMORY EXPERIMENT</div><h1>退屈を、<br>覚えていますか。</h1>
- <p class="description">地味な動画を10本、ランダムな順番で。全部で3分。<br>見終わったら、内容と順番をどれだけ覚えているかテストします。</p>
+ <p class="description">地味な動画を10本、ランダムな順番で。全編で約3分。</p>
+ <section class="quiz-notice" aria-label="クイズのお知らせ">
+   <strong>このあと、クイズを出します。</strong>
+   <p>10本の動画を見たあと、内容や再生順について4択で10問出題します。<br>スキップした動画も出題対象です。</p>
+ </section>
  ${stats([['10','VIDEOS'],['180','SECONDS'],['10','QUESTIONS']])}
  <button class="btn btn-primary" id="start">テストをはじめる　→</button>
  <p class="info">上にスワイプしてスキップできます。<br>クイズも途中終了できます。音声・通信は不要です。</p>

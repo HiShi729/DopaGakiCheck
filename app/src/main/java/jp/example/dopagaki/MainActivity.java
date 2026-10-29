@@ -211,17 +211,30 @@ public final class MainActivity extends Activity {
         headline.setLineSpacing(dp(5), 1.0f);
         content.addView(headline);
         gap(content, 18);
-        TextView subtitle = text("地味な動画を10本、ランダムな順番で。全部で3分。\n見終わったら内容と順番をどれだけ覚えているかテストします。", 16, MUTED, false);
+        TextView subtitle = text("地味な動画を10本、ランダムな順番で。全編で約3分。", 15, MUTED, false);
         subtitle.setLineSpacing(dp(5), 1.0f);
         content.addView(subtitle);
-        gap(content, 34);
+        gap(content, 18);
+
+        // Announce the follow-up quiz before starting the video feed.
+        LinearLayout quizNotice = stack(0);
+        quizNotice.setPadding(dp(18), dp(16), dp(18), dp(16));
+        quizNotice.setBackground(round(SURFACE_2, 16));
+        TextView noticeTitle = text("このあと、クイズを出します。", 18, ACCENT, true);
+        quizNotice.addView(noticeTitle);
+        gap(quizNotice, 7);
+        TextView noticeBody = text("10本の動画を見たあと、内容や再生順について4択で10問出題します。\nスキップした動画も出題対象です。", 14, WHITE, false);
+        noticeBody.setLineSpacing(dp(3), 1.0f);
+        quizNotice.addView(noticeBody);
+        content.addView(quizNotice, new LinearLayout.LayoutParams(-1, -2));
+        gap(content, 24);
         LinearLayout statRow = new LinearLayout(this);
         statRow.setOrientation(LinearLayout.HORIZONTAL);
         addStat(statRow, "10", "VIDEOS");
         addStat(statRow, "180", "SECONDS");
         addStat(statRow, "10", "QUESTIONS");
         content.addView(statRow);
-        gap(content, 38);
+        gap(content, 28);
         TextView start = actionButton("テストをはじめる  →", true);
         content.addView(start, new LinearLayout.LayoutParams(-1, dp(62)));
         start.setOnClickListener(v -> renderFeed());
