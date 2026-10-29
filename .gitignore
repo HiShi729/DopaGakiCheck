@@ -5,6 +5,7 @@ local.properties
 .idea/
 *.iml
 .DS_Store
+.idea
 tests/__pycache__/
 
 # app/, gradle/, tests/, tools/, web-demo/ contain source and must be tracked
