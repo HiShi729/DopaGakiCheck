@@ -466,7 +466,62 @@
           box-shadow: 0 0 100px #152027;
         }
       }
-    </style>
+  
+      /* Large screens: center vertical video and use two quiz columns. */
+      @media (min-width: 650px) {
+        body { background: #060a0e; }
+        .container.intro, .container.result {
+          max-width: 760px;
+          padding-left: 44px;
+          padding-right: 44px;
+        }
+        .container.quiz {
+          max-width: 790px;
+          padding-left: 32px;
+          padding-right: 32px;
+        }
+        .feed {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+        .feed-inner {
+          max-width: none;
+          width: min(100vw, 56.25dvh);
+          height: min(100dvh, 177.7778vw);
+          flex-shrink: 0;
+          box-shadow: 0 0 0 1px #25313a;
+        }
+        .feed-inner video { object-fit: contain; }
+        .quiz .options-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 12px;
+        }
+        .quiz .options-grid .option {
+          width: 100%;
+          min-height: 64px;
+          margin: 0;
+          padding: 12px 14px;
+          font-size: 17px;
+        }
+        .quiz .options-grid .option b { flex: 0 0 30px; }
+        .quiz small { margin-top: 12px; }
+        .quiz .segments { margin: 13px 0 24px; }
+        .quiz h2 { font-size: clamp(22px, 3vw, 30px); margin-bottom: 20px; }
+        .quit-top { top: 16px; }
+      }
+      @media (min-width: 650px) and (max-height: 850px) {
+        .container.quiz { padding-top: 16px; padding-bottom: 16px; }
+        .quiz .segments { margin: 8px 0 16px; }
+        .quiz h2 { margin-bottom: 12px; }
+        .quiz .options-grid .option { min-height: 52px; }
+        .quiz-still { width: auto; height: clamp(96px, 18dvh, 160px); }
+        .quiz .btn { margin-top: 14px; min-height: 52px; }
+        .quiz .btn#quit { margin-top: 8px; min-height: 48px; }
+        .quiz .info { margin-top: 8px; }
+      }
+  </style>
   </head>
   <body>
     <div id="app"></div>
@@ -609,7 +664,9 @@
  <div class="question-clip">${q.isOrderQuestion ? "動画の順番に関する問題" : "動画の内容に関する問題"}</div>
  ${q.isOrderQuestion ? `<img class="quiz-still" src="./stills/still${fmt(q.videoId + 1)}.jpg" alt="今回流れた動画の静止画" />` : ""}
  <h2>${q.prompt}</h2>
+ <div class="options-grid">
  ${q.options.map((v, i) => `<button class="option ${selected === i ? "selected" : ""}" data-answer="${i}"><b>${"ABCD"[i]}</b>${v}</button>`).join("")}
+ </div>
  <button class="btn btn-primary" id="next" ${selected < 0 ? "disabled" : ""}>${quiz === 9 ? "結果を見る　→" : "回答を確定して次へ　→"}</button>
  <button class="btn" id="quit">ここでクイズをやめる</button>
  <p class="info">途中終了時は未回答が不正解になり、ドパガキ度に10ポイント加算されます。</p></main>`;

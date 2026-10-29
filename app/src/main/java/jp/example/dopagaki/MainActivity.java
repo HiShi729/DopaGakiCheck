@@ -80,6 +80,8 @@ public final class MainActivity extends Activity {
     private int selectedOption = -1;
     private boolean userPaused = false;
     private int pauseCount = 0;
+    private int pendingSeekPositionMs = 0;
+    private boolean restorePaused = false;
 
     private final Runnable timerTick = new Runnable() {
         @Override public void run() {
@@ -127,6 +129,22 @@ public final class MainActivity extends Activity {
         }
     }
 
+    @Override public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Preserve session, answers and playback slot while the display rotates.
+        if (mode == FEED) {
+            pendingSeekPositionMs = videoView == null ? 0 : videoView.getCurrentPosition();
+            restorePaused = userPaused;
+            renderFeed();
+        } else if (mode == QUIZ) {
+            renderQuiz();
+        } else if (mode == RESULT) {
+            renderResult();
+        } else {
+            renderIntro();
+        }
+    }
+
     @Override protected void onDestroy() {
         detachVideo();
         super.onDestroy();
@@ -162,6 +180,8 @@ public final class MainActivity extends Activity {
         selectedOption = -1;
         userPaused = false;
         pauseCount = 0;
+        pendingSeekPositionMs = 0;
+        restorePaused = false;
         for (int i = 0; i < CLIP_COUNT; i++) {
             completed[i] = false;
             skipped[i] = false;
@@ -200,7 +220,9 @@ public final class MainActivity extends Activity {
         FrameLayout screen = darkPage();
         screen.addView(new IntroArt(this), new FrameLayout.LayoutParams(-1, -1));
         ScrollView scroll = makeScroll();
-        LinearLayout content = stack(26);
+        LinearLayout content = stack(0);
+        int inset = contentInsetDp(26, 660);
+        content.setPadding(inset, dp(26), inset, dp(20));
         content.setGravity(Gravity.CENTER_VERTICAL);
         content.setMinimumHeight(getResources().getDisplayMetrics().heightPixels - dp(36));
 
@@ -261,24 +283,48 @@ public final class MainActivity extends Activity {
             return;
         }
         FrameLayout screen = new FrameLayout(this);
-        screen.setBackgroundColor(Color.BLACK);
+        screen.setBackgroundColor(DARK);
         setPage(screen, FEED);
-        userPaused = false;
+        userPaused = restorePaused;
+        restorePaused = false;
+
+        // A centered 9:16 viewport avoids stretching the feed on large screens.
+        FrameLayout viewport = new FrameLayout(this);
+        viewport.setBackgroundColor(Color.BLACK);
+        if (isTablet()) {
+            int screenWidth = getResources().getDisplayMetrics().widthPixels;
+            int screenHeight = getResources().getDisplayMetrics().heightPixels;
+            int videoHeight = Math.min(screenHeight, (int) (screenWidth * 16f / 9f));
+            int videoWidth = Math.min(screenWidth, (int) (videoHeight * 9f / 16f));
+            screen.addView(viewport,
+                new FrameLayout.LayoutParams(videoWidth, videoHeight, Gravity.CENTER));
+        } else {
+            screen.addView(viewport, new FrameLayout.LayoutParams(-1, -1));
+        }
 
         videoView = new VideoView(this);
         // Do not apply an opaque background to a VideoView: it may cover its video surface.
         videoView.setBackgroundColor(Color.TRANSPARENT);
         videoView.setKeepScreenOn(true);
-        screen.addView(videoView, new FrameLayout.LayoutParams(-1, -1));
+        viewport.addView(videoView, new FrameLayout.LayoutParams(-1, -1));
         Uri uri = Uri.parse("android.resource://" + getPackageName() + "/" + VIDEOS[session.videoOrder[clipIndex]]);
         videoView.setOnPreparedListener(mp -> {
             mp.setLooping(false);
+            if (pendingSeekPositionMs > 0) {
+                int seekPosition = pendingSeekPositionMs;
+                pendingSeekPositionMs = 0;
+                videoView.seekTo(seekPosition);
+            }
             if (mode == FEED && !userPaused) videoView.start();
+            if (pauseBadge != null) {
+                pauseBadge.setVisibility(userPaused ? View.VISIBLE : View.GONE);
+            }
         });
         videoView.setOnCompletionListener(mp -> {
             if (mode != FEED) return;
             completed[clipIndex] = true;
             playTimeMs[clipIndex] = CLIP_DURATION_MS;
+            pendingSeekPositionMs = 0;
             clipIndex++;
             renderFeed();
         });
@@ -292,7 +338,7 @@ public final class MainActivity extends Activity {
 
         // Touch capture layer: swipe up to skip, tap to pause/play, swipe down does not rewind.
         View touchLayer = new View(this);
-        screen.addView(touchLayer, new FrameLayout.LayoutParams(-1, -1));
+        viewport.addView(touchLayer, new FrameLayout.LayoutParams(-1, -1));
         touchLayer.setOnTouchListener(new View.OnTouchListener() {
             private float downX, downY;
             @Override public boolean onTouch(View v, MotionEvent event) {
@@ -320,10 +366,10 @@ public final class MainActivity extends Activity {
         View topShade = new View(this);
         topShade.setBackground(gradient(Color.argb(205, 0, 0, 0), Color.TRANSPARENT, 0));
         FrameLayout.LayoutParams topShadeLp = new FrameLayout.LayoutParams(-1, dp(190), Gravity.TOP);
-        screen.addView(topShade, topShadeLp);
+        viewport.addView(topShade, topShadeLp);
         View bottomShade = new View(this);
         bottomShade.setBackground(gradient(Color.TRANSPARENT, Color.argb(225, 0, 0, 0), 0));
-        screen.addView(bottomShade, new FrameLayout.LayoutParams(-1, dp(340), Gravity.BOTTOM));
+        viewport.addView(bottomShade, new FrameLayout.LayoutParams(-1, dp(isTablet() ? 205 : 340), Gravity.BOTTOM));
 
         LinearLayout top = stack(0);
         top.setPadding(dp(22), dp(34), dp(22), 0);
@@ -345,14 +391,14 @@ public final class MainActivity extends Activity {
             segments.addView(part, sp);
         }
         top.addView(segments);
-        screen.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
+        viewport.addView(top, new FrameLayout.LayoutParams(-1, -2, Gravity.TOP));
 
         pauseBadge = text("一時停止  ·  タップで再開", 16, WHITE, true);
         pauseBadge.setGravity(Gravity.CENTER);
         pauseBadge.setBackground(round(Color.argb(196, 0, 0, 0), 18));
         pauseBadge.setPadding(dp(18), dp(12), dp(18), dp(12));
         pauseBadge.setVisibility(View.GONE);
-        screen.addView(pauseBadge, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+        viewport.addView(pauseBadge, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
 
         LinearLayout bottom = stack(8);
         bottom.setPadding(dp(23), 0, dp(22), dp(45));
@@ -375,7 +421,7 @@ public final class MainActivity extends Activity {
         actionRow.addView(skip);
         skip.setOnClickListener(v -> advanceBySkipping());
         bottom.addView(actionRow);
-        screen.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
+        viewport.addView(bottom, new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM));
         videoView.setVideoURI(uri);
         videoView.requestFocus();
         handler.post(timerTick);
@@ -386,6 +432,7 @@ public final class MainActivity extends Activity {
         int current = videoView == null ? 0 : videoView.getCurrentPosition();
         playTimeMs[clipIndex] = Math.max(0, Math.min(CLIP_DURATION_MS, current));
         skipped[clipIndex] = true;
+        pendingSeekPositionMs = 0;
         clipIndex++;
         renderFeed();
     }
@@ -403,12 +450,42 @@ public final class MainActivity extends Activity {
         if (pauseBadge != null) pauseBadge.setVisibility(userPaused ? View.VISIBLE : View.GONE);
     }
 
+    private LinearLayout makeQuizOption(GameSession.QuizQuestion q, int choice,
+                                        boolean compact, boolean tablet) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(tablet ? 11 : 13), dp(5), dp(tablet ? 11 : 13), dp(5));
+        boolean chosen = selectedOption == choice;
+        GradientDrawable background = round(chosen ? Color.rgb(41, 61, 43) : SURFACE,
+            tablet ? 13 : 16);
+        background.setStroke(dp(1), chosen ? ACCENT : BORDER);
+        row.setBackground(background);
+        TextView letter = text(String.valueOf((char) ('A' + choice)),
+            tablet ? 14 : 15, chosen ? ACCENT : MUTED, true);
+        letter.setGravity(Gravity.CENTER);
+        row.addView(letter, new LinearLayout.LayoutParams(dp(tablet ? 32 : 35), -2));
+        TextView label = text(q.options[choice],
+            tablet ? (compact ? 14 : 16) : (compact ? 15 : 17), WHITE, chosen);
+        if (tablet) label.setMaxLines(4);
+        row.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
+        if (chosen) row.addView(text("●", tablet ? 16 : 18, ACCENT, true));
+        row.setOnClickListener(v -> {
+            selectedOption = choice;
+            renderQuiz();
+        });
+        return row;
+    }
+
     private void renderQuiz() {
         FrameLayout screen = darkPage();
         int usableDp = (int)(getResources().getDisplayMetrics().heightPixels / getResources().getDisplayMetrics().density);
         boolean compact = usableDp < 760;
+        boolean tablet = isTablet();
         LinearLayout content = stack(0);
-        content.setPadding(dp(19), dp(compact ? 15 : 28), dp(19), dp(12));
+        if (tablet) content.setGravity(Gravity.CENTER_VERTICAL);
+        int sidePadding = contentInsetDp(19, 740);
+        content.setPadding(sidePadding, dp(compact ? 15 : 28), sidePadding, dp(12));
         LinearLayout quizHeader = new LinearLayout(this);
         quizHeader.setGravity(Gravity.CENTER_VERTICAL);
         quizHeader.addView(text("DOPA / QUIZ", 13, ACCENT, true),
@@ -456,32 +533,31 @@ public final class MainActivity extends Activity {
         content.addView(title);
         gap(content, compact ? 12 : 20);
 
-        for (int i = 0; i < question.options.length; i++) {
-            final int choice = i;
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(13), dp(5), dp(13), dp(5));
-            boolean chosen = selectedOption == i;
-            GradientDrawable background = round(chosen ? Color.rgb(41, 61, 43) : SURFACE, 16);
-            background.setStroke(dp(1), chosen ? ACCENT : BORDER);
-            row.setBackground(background);
-            TextView letter = text(String.valueOf((char) ('A' + i)), 15, chosen ? ACCENT : MUTED, true);
-            letter.setGravity(Gravity.CENTER);
-            row.addView(letter, new LinearLayout.LayoutParams(dp(35), -2));
-            TextView optionText = text(question.options[i], compact ? 15 : 17, WHITE, chosen);
-            row.addView(optionText, new LinearLayout.LayoutParams(0, -2, 1));
-            if (chosen) {
-                TextView checked = text("●", 18, ACCENT, true);
-                row.addView(checked);
+        if (tablet) {
+            // Two columns for wide screens. Allow the rows to grow with the label.
+            for (int rowIndex = 0; rowIndex < 2; rowIndex++) {
+                LinearLayout optionsRow = new LinearLayout(this);
+                optionsRow.setOrientation(LinearLayout.HORIZONTAL);
+                for (int col = 0; col < 2; col++) {
+                    int choice = rowIndex * 2 + col;
+                    LinearLayout option = makeQuizOption(question, choice, compact, true);
+                    option.setMinimumHeight(dp(68));
+                    LinearLayout.LayoutParams cell = new LinearLayout.LayoutParams(0, -2, 1);
+                    if (col == 0) cell.setMargins(0, 0, dp(10), 0);
+                    optionsRow.addView(option, cell);
+                }
+                LinearLayout.LayoutParams rowLayout = new LinearLayout.LayoutParams(-1, -2);
+                rowLayout.setMargins(0, 0, 0, dp(9));
+                content.addView(optionsRow, rowLayout);
             }
-            LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, dp(compact ? 45 : 54));
-            rp.setMargins(0, 0, 0, dp(compact ? 6 : 9));
-            content.addView(row, rp);
-            row.setOnClickListener(v -> {
-                selectedOption = choice;
-                renderQuiz();
-            });
+        } else {
+            for (int i = 0; i < question.options.length; i++) {
+                LinearLayout option = makeQuizOption(question, i, compact, false);
+                LinearLayout.LayoutParams p =
+                    new LinearLayout.LayoutParams(-1, dp(compact ? 45 : 54));
+                p.setMargins(0, 0, 0, dp(compact ? 6 : 9));
+                content.addView(option, p);
+            }
         }
         gap(content, compact ? 7 : 11);
         TextView next = actionButton(questionIndex == CLIP_COUNT - 1 ? "結果を見る  →" : "回答を確定して次へ  →", selectedOption >= 0);
@@ -495,7 +571,14 @@ public final class MainActivity extends Activity {
             if (questionIndex == CLIP_COUNT) renderResult();
             else renderQuiz();
         });
-        screen.addView(content, new FrameLayout.LayoutParams(-1, -1));
+        if (tablet) {
+            ScrollView scroll = makeScroll();
+            content.setMinimumHeight(getResources().getDisplayMetrics().heightPixels);
+            scroll.addView(content, new ScrollView.LayoutParams(-1, -2));
+            screen.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+        } else {
+            screen.addView(content, new FrameLayout.LayoutParams(-1, -1));
+        }
         setPage(screen, QUIZ);
     }
 
@@ -563,7 +646,8 @@ public final class MainActivity extends Activity {
         FrameLayout screen = darkPage();
         ScrollView scroll = makeScroll();
         LinearLayout content = stack(0);
-        content.setPadding(dp(25), dp(50), dp(25), dp(42));
+        int resultInset = contentInsetDp(25, 740);
+        content.setPadding(resultInset, dp(50), resultInset, dp(42));
 
         content.addView(text("DOPA / RESULT", 13, ACCENT, true));
         gap(content, 24);
@@ -670,6 +754,16 @@ public final class MainActivity extends Activity {
     }
 
     // ---- View and style helpers, all using Android framework APIs only ----
+    private boolean isTablet() {
+        return getResources().getConfiguration().smallestScreenWidthDp >= 600;
+    }
+
+    /** Center content on large screens while retaining the phone's usable width. */
+    private int contentInsetDp(int minimumDp, int maxContentWidthDp) {
+        int screenWidthDp = getResources().getConfiguration().screenWidthDp;
+        return dp(Math.max(minimumDp, (screenWidthDp - maxContentWidthDp) / 2));
+    }
+
     private int dp(float x) {
         return (int) (x * getResources().getDisplayMetrics().density + .5f);
     }
