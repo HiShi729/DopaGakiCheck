@@ -7,5 +7,6 @@ local.properties
 .DS_Store
 .idea
 tests/__pycache__/
+.vscode
 
 # app/, gradle/, tests/, tools/, web-demo/ contain source and must be tracked
