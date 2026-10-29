@@ -15,11 +15,19 @@
 - VideoViewの表示・動画URI設定順序を見直し、再生素材をソース配布ZIPに同梱
 - ランチャーアイコンを追加
 
+## 作者
+
+- **HiShi729** — [GitHubプロフィール](https://github.com/HiShi729)
+
 ## ライセンスと著作権
 
-- BSD 3-Clause License（詳細は[LICENSE](LICENSE)を参照）
-- Copyright (c) 2026 HiShi729 (https://github.com/HiShi729)
-- ソースコードおよびバイナリの再配布・改変は可能。ただし著作権表示、ライセンス条項、免責事項を保持すること
+本プロジェクトは **BSD 3-Clause License** で公開しています。詳細は [LICENSE](LICENSE) を参照してください。
+
+```text
+Copyright (c) 2026 HiShi729 (https://github.com/HiShi729)
+```
+
+ソースコード・バイナリの改変、商用利用、再配布を許可します。ただし再配布時には、**上記のURLを含む著作権表示**、BSD 3-Clauseのライセンス条項、免責事項を保持する必要があります。本名の記載は不要です。
 
 ## 追加した機能（v1.1）
 
