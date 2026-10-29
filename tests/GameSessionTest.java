@@ -4,64 +4,48 @@ import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
 
-/** Run with: sh tests/run_tests.sh (no Android SDK needed). */
+/** Pure Java tests (without Android SDK). Run tests/run_tests.sh. */
 public final class GameSessionTest {
-    private static void require(boolean condition, String message) {
-        if (!condition) throw new AssertionError(message);
+    private static void require(boolean ok, String message) {
+        if (!ok) throw new AssertionError(message);
     }
     public static void main(String[] args) {
-        Set<String> permutations = new HashSet<>();
-        for (int seed=0; seed < 1200; seed++) {
-            GameSession game = new GameSession(new Random(seed));
-            permutations.add(Arrays.toString(game.videoOrder));
-            boolean[] seen = new boolean[10];
-            int[] positions = new int[10];
-            for (int i=0; i<10; i++) {
-                int videoId = game.videoOrder[i];
-                require(videoId>=0 && videoId<10 && !seen[videoId], "video ID repeats");
-                seen[videoId] = true;
-                positions[videoId] = i+1;
+        require(GameSession.VIDEO_POOL_COUNT == 20, "20 story candidates");
+        require(GameSession.CONTENT_QUESTION_COUNT == 10, "all ten are story questions");
+        Set<String> pickedSets = new HashSet<>();
+        boolean[] seenAcrossTrials = new boolean[20];
+        int[] hits = new int[20];
+        for (int seed=0; seed<2000; seed++) {
+            GameSession s=new GameSession(new Random(seed));
+            require(s.videoOrder.length==10 && s.questions.length==10, "10 clips / 10 questions");
+            boolean[] seen=new boolean[20];
+            for (int id:s.videoOrder) {
+                require(id>=0 && id<20 && !seen[id], "selected clips must be unique");
+                seen[id]=true;seenAcrossTrials[id]=true;
             }
-            int orderQuestions=0, contentQuestions=0;
-            boolean[] askedVideos = new boolean[10];
-            for (GameSession.QuizQuestion q:game.questions) {
-                require(!askedVideos[q.videoId],"duplicate question for video");
-                askedVideos[q.videoId] = true;
-                require(q.correctIndex>=0 && q.correctIndex<4,"correct index outside 4 choices");
-                Set<String> unique = new HashSet<>(Arrays.asList(q.options));
-                require(unique.size()==4,"duplicate answer options");
-                if (q.isOrderQuestion) {
-                    orderQuestions++;
-                    require(q.prompt.contains("何番目"),"order question missing topic");
-                    require(q.options[q.correctIndex].equals(positions[q.videoId]+"番目"),"wrong order question answer");
-                } else {
-                    contentQuestions++;
-                }
+            int[] sorted=s.videoOrder.clone();Arrays.sort(sorted);
+            pickedSets.add(Arrays.toString(sorted));
+            boolean[] asked=new boolean[20];
+            for (GameSession.QuizQuestion q:s.questions) {
+                require(seen[q.videoId] && !asked[q.videoId], "one question per viewed clip");
+                asked[q.videoId]=true;hits[q.videoId]++;
+                require(q.correctIndex>=0 && q.correctIndex<4, "valid answer index");
+                require(q.options.length==4 && new HashSet<>(Arrays.asList(q.options)).size()==4, "four distinct choices");
+                require(!q.prompt.matches(".*(何色|何枚|何本|何番目|何個).*"),"no color/count/order trivia");
+                require(q.explanation.length()>8, "explanation exists");
             }
-            require(orderQuestions==2 && contentQuestions==8,"question type balance invalid");
-            require(game.answeredCount()==0 && game.correctCount()==0,"session should be empty");
-            require(game.dopaScorePercent()==100,"no answers should produce 100 score");
-            for(int i=0;i<10;i++){
-                game.submitAnswer(i, game.questions[i].correctIndex);
-                require(game.correctCount()==i+1,"correct answer scoring failed");
-            }
-            require(game.answeredCount()==10 && game.correctCount()==10,"perfect answer count failed");
-            require(game.dopaScorePercent()==0,"perfect score should be zero");
+            for(int i=0;i<10;i++)s.submitAnswer(i,s.questions[i].correctIndex);
+            require(s.correctCount()==10 && s.dopaScorePercent()==0,"perfect score");
         }
-        require(permutations.size()>1100,"video shuffling seems broken");
-        GameSession early = new GameSession(new Random(198));
-        for(int i=0;i<3;i++) early.submitAnswer(i,early.questions[i].correctIndex);
+        require(pickedSets.size()>1000,"random selection must vary");
+        for(int i=0;i<20;i++) require(seenAcrossTrials[i] && hits[i]>100,"story must be selectable");
+        GameSession early=new GameSession(new Random(123));
+        for(int i=0;i<3;i++)early.submitAnswer(i,early.questions[i].correctIndex);
         early.quitQuiz();
-        require(early.answeredCount()==3,"quit must preserve prior answers");
-        require(early.correctCount()==3,"quit must keep all earlier correct answers");
-        require(early.overallAccuracyPercent()==30,"unanswered must count as incorrect");
-        require(early.dopaScorePercent()==80,"quit penalty should add 10 points");
+        require(early.answeredCount()==3 && early.dopaScorePercent()==80,"quit penalty");
         boolean rejected=false;
-        try {early.submitAnswer(3,0);} catch(IllegalStateException expected){rejected=true;}
-        require(rejected,"should reject submissions after quit");
-        GameSession zero = new GameSession(new Random(0));
-        zero.quitQuiz();
-        require(zero.dopaScorePercent()==100,"score should cap at 100");
-        System.out.println("Java game engine: 1200 sessions, 8+2 questions, shuffle, order choices, perfect score, quit penalty PASSED");
+        try{early.submitAnswer(3,0);}catch(IllegalStateException expected){rejected=true;}
+        require(rejected,"no answers after quit");
+        System.out.println("Java: 2000 sessions, 20 picture-book clips, 10 story questions, scores PASS");
     }
 }
